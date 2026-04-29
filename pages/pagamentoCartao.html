@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pagamento com Cartão</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: black;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+ 
+    .ck-wrap { width: 100%; max-width: 480px; }
+ 
+    /* ── Cartão preview ── */
+    .card-preview {
+      width: 100%;
+      max-width: 380px;
+      height: 210px;
+      margin: 0 auto 1.5rem;
+      border-radius: 16px;
+      background: #7f7f99;
+      position: relative;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+      color: #fff;
+      transition: background 0.4s;
+    }
+ 
+    .card-deco1 {
+      position: absolute; width: 220px; height: 220px; border-radius: 50%;
+      background: rgba(255,255,255,0.05); top: -60px; right: -60px;
+    }
+    .card-deco2 {
+      position: absolute; width: 160px; height: 160px; border-radius: 50%;
+      background: rgba(255,255,255,0.04); bottom: -50px; left: -30px;
+    }
+ 
+    .card-chip {
+      position: absolute; top: 28px; left: 24px;
+      width: 40px; height: 30px; border-radius: 6px;
+      background: #d4a843;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr 1fr;
+      gap: 2px; padding: 4px;
+    }
+    .card-chip span { background: #b8912e; border-radius: 1px; }
+ 
+    .card-brand {
+      position: absolute; top: 20px; right: 22px;
+      font-size: 13px; font-weight: 600; letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.85);
+    }
+ 
+    .card-number {
+      position: absolute; bottom: 58px; left: 24px;
+      font-size: 18px; letter-spacing: 0.2em; color: #fff;
+    }
+ 
+    .card-info {
+      position: absolute; bottom: 20px; left: 24px; right: 24px;
+      display: flex; justify-content: space-between; align-items: flex-end;
+    }
+ 
+    .card-label {
+      font-size: 9px; color: black(255,255,255,0.5);
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px;
+      font-family: -apple-system, sans-serif;
+    }
+ 
+    .card-val { font-size: 13px; color: #fff; letter-spacing: 0.05em; }
+ 
+    /* Verso do cartão (CVV) */
+    .card-cvv-side {
+      position: absolute; inset: 0;
+      background: #111; border-radius: 16px;
+      display: none; flex-direction: column;
+      justify-content: center; align-items: center; gap: 12px;
+    }
+    .card-cvv-side.show { display: flex; }
+    .card-stripe { width: 100%; height: 44px; background: #333; }
+    .cvv-box {
+      background: #fff; color: #111;
+      font-family: 'Courier New', monospace;
+      font-size: 16px; padding: 6px 20px;
+      border-radius: 4px; letter-spacing: 0.2em;
+      min-width: 80px; text-align: right;
+    }
+    .cvv-label { font-size: 11px; color: rgba(255,255,255,0.5); font-family: sans-serif; }
+ 
+    /* ── Formulário ── */
+    .form-card {
+      background: #fff;
+      border: 1px solid #e5e5e0;
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+ 
+    .amount-row {
+      display: flex; align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 1rem; padding-bottom: 1rem;
+      border-bottom: 1px solid #00e5ff;
+    }
+    .amount-label { font-size: 13px; color: black; }
+    .amount-val { font-size: 22px; font-weight: 600; color: #111; }
+ 
+    .field-group { margin-bottom: 1rem; }
+ 
+    .field-label {
+      font-size: 11px; font-weight: 600; color: black;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 6px; display: block;
+    }
+ 
+    input, select {
+      width: 100%; padding: 9px 12px;
+      border: 1px solid #00e5ff; border-radius: 8px;
+      font-size: 14px; color: #111; background: #fff;
+      outline: none; transition: border-color 0.15s;
+    }
+    input { font-family: 'Courier New', monospace; }
+    input.sans { font-family: -apple-system, sans-serif; }
+    select { font-family: -apple-system, sans-serif; }
+    input:focus, select:focus { border-color: #5c6bc0; }
+ 
+    .field-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field-row-3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+ 
+    .error-msg { font-size: 11px; color: #c0392b; margin-top: 3px; display: none; }
+ 
+    .pay-btn {
+      width: 100%; margin-top: 1.25rem; padding: 13px;
+      border-radius: 8px; background: #00e5ff;
+      color: white; font-size: 15px; font-weight: 600;
+      border: none; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-family: -apple-system, sans-serif;
+    }
+    .pay-btn:hover { opacity: 0.9; }
+    .pay-btn:active { transform: scale(0.99); }
+    .pay-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+ 
+    .lock-icon { width: 14px; height: 14px; flex-shrink: 0; }
+ 
+    /* ── Tela de sucesso ── */
+    .success-screen {
+      display: none; flex-direction: column;
+      align-items: center; padding: 2.5rem 1rem;
+      text-align: center; gap: 12px;
+    }
+    .success-screen.show { display: flex; }
+ 
+    .success-circle {
+      width: 60px; height: 60px; border-radius: 50%;
+      background: #e8f5e9;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .success-check {
+      width: 30px; height: 30px;
+      stroke: #2e7d32; stroke-width: 2.5; fill: none;
+    }
+    .success-title { font-size: 18px; font-weight: 600; color: #111; }
+    .success-sub   { font-size: 13px; color: #888; max-width: 280px; }
+ 
+    .new-btn {
+      margin-top: 8px; padding: 11px 28px;
+      border-radius: 8px; background: transparent;
+      border: 1px solid #ddd; color: #111;
+      font-size: 14px; cursor: pointer;
+      transition: background 0.15s;
+      font-family: -apple-system, sans-serif;
+    }
+    .new-btn:hover { background: #f4f4f0; }
+ 
+    @media (max-width: 420px) {
+      .field-row-3 { grid-template-columns: 1fr 1fr; }
+      .field-row-3 .field-group:first-child { grid-column: span 2; }
+    }
+  </style>
+</head>
+<body>
+ 
+<div class="ck-wrap">
+ 
+  <!-- Cartão animado -->
+  <div class="card-preview" id="card-preview">
+    <div class="card-deco1"></div>
+    <div class="card-deco2"></div>
+    <div class="card-chip">
+      <span></span><span></span><span></span>
+      <span></span><span></span><span></span>
+      <span></span><span></span><span></span>
+    </div>
+    <div class="card-brand" id="card-brand">VISA</div>
+    <div class="card-number" id="card-number">•••• •••• •••• ••••</div>
+    <div class="card-info">
+      <div>
+        <div class="card-label">Titular</div>
+        <div class="card-val" id="card-name">NOME DO TITULAR</div>
+      </div>
+      <div style="text-align:right">
+        <div class="card-label">Validade</div>
+        <div class="card-val" id="card-expiry">MM/AA</div>
+      </div>
+    </div>
+    <!-- Verso (CVV) -->
+    <div class="card-cvv-side" id="card-back">
+      <div class="card-stripe"></div>
+      <div class="cvv-label">CVV</div>
+      <div class="cvv-box" id="card-cvv-display">•••</div>
+    </div>
+  </div>
+ 
+  <!-- Formulário -->
+  <div class="form-card" id="form-area">
+    <div class="amount-row">
+      <span class="amount-label">Total a pagar</span>
+      <span class="amount-val" id="total-display">R$ 199,90</span>
+    </div>
+ 
+    <div class="field-group">
+      <label class="field-label" for="f-number">Número do cartão</label>
+      <input type="text" id="f-number" placeholder="0000 0000 0000 0000"
+             maxlength="19" autocomplete="cc-number" inputmode="numeric" />
+      <span class="error-msg" id="err-number">Número de cartão inválido.</span>
+    </div>
+ 
+    <div class="field-group">
+      <label class="field-label" for="f-name">Nome do titular</label>
+      <input type="text" id="f-name" class="sans" placeholder="Nome no cartão"
+             maxlength="26" autocomplete="cc-name" />
+    </div>
+ 
+    <div class="field-row-3">
+      <div class="field-group">
+        <label class="field-label" for="f-expiry">Validade</label>
+        <input type="text" id="f-expiry" placeholder="MM/AA"
+               maxlength="5" autocomplete="cc-exp" inputmode="numeric" />
+        <span class="error-msg" id="err-expiry">Data inválida ou expirada.</span>
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="f-cvv">CVV</label>
+        <input type="text" id="f-cvv" placeholder="•••"
+               maxlength="4" autocomplete="cc-csc" inputmode="numeric" />
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="f-amount">Valor (R$)</label>
+        <input type="text" id="f-amount" class="sans" placeholder="199,90" value="199,90" inputmode="decimal" />
+      </div>
+    </div>
+ 
+    <div class="field-group">
+      <label class="field-label" for="f-installments">Parcelamento</label>
+      <select id="f-installments"></select>
+    </div>
+ 
+    <button class="pay-btn" id="pay-btn">
+      <svg class="lock-icon" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="11" width="14" height="10" rx="2"/>
+        <path d="M8 11V7a4 4 0 018 0v4"/>
+      </svg>
+      Pagar agora
+    </button>
+  </div>
+ 
+  <!-- Tela de sucesso -->
+  <div class="success-screen" id="success-screen">
+    <div class="success-circle">
+      <svg class="success-check" viewBox="0 0 24 24">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <div class="success-title">Pagamento aprovado!</div>
+    <div class="success-sub" id="success-detail"></div>
+    <button class="new-btn" onclick="resetForm()">Novo pagamento</button>
+  </div>
+ 
+</div>
+ 
+<script>
+  /* ── Bandeiras ── */
+  const brands = {
+    visa:       { name: 'VISA',       re: /^4/ },
+    mastercard: { name: 'MASTERCARD', re: /^5[1-5]|^2[2-7]/ },
+    amex:       { name: 'AMEX',       re: /^3[47]/ },
+    elo:        { name: 'ELO',        re: /^4011|^4312|^4389|^6362/ },
+    hipercard:  { name: 'HIPERCARD',  re: /^606282/ },
+  };
+ 
+  const bgMap = {
+    visa: '#1a1a2e', mastercard: '#2d1b4e',
+    amex: '#1a3a2e', elo: '#2e1a0e', hipercard: '#3a1a1a',
+  };
+ 
+  function detectBrand(num) {
+    const d = num.replace(/\D/g, '');
+    for (const [k, v] of Object.entries(brands)) {
+      if (v.re.test(d)) return k;
+    }
+    return null;
+  }
+ 
+  /* ── Formatação ── */
+  function formatCardNumber(val) {
+    return val.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+  }
+ 
+  /* ── Luhn ── */
+  function luhn(num) {
+    const d = num.replace(/\D/g, '');
+    if (d.length < 13) return false;
+    let sum = 0, alt = false;
+    for (let i = d.length - 1; i >= 0; i--) {
+      let n = parseInt(d[i]);
+      if (alt) { n *= 2; if (n > 9) n -= 9; }
+      sum += n;
+      alt = !alt;
+    }
+    return sum % 10 === 0;
+  }
+ 
+  /* ── Parcelamento ── */
+  function buildInstallments(amount) {
+    const sel = document.getElementById('f-installments');
+    sel.innerHTML = '';
+    // taxa mensal: 0% até 3x, depois cresce
+    const rates = [0, 0, 0, 0, 1.99, 2.49, 2.99, 3.49, 3.99, 4.49, 4.99, 5.49, 5.99];
+    for (let i = 1; i <= 12; i++) {
+      const rate = rates[i] || 0;
+      const total = rate > 0 ? amount * Math.pow(1 + rate / 100, i) : amount;
+      const parcel = total / i;
+      const opt = document.createElement('option');
+      opt.value = i;
+      const rateStr = rate > 0 ? ` (${rate}% a.m.)` : ' sem juros';
+      opt.textContent = `${i}x de R$ ${parcel.toFixed(2).replace('.', ',')}${rateStr}`;
+      sel.appendChild(opt);
+    }
+  }
+ 
+  /* ── Listeners ── */
+ 
+  // Valor
+  document.getElementById('f-amount').addEventListener('input', function () {
+    this.value = this.value.replace(/[^\d,]/g, '');
+    const v = parseFloat(this.value.replace(',', '.'));
+    if (!isNaN(v) && v > 0) {
+      document.getElementById('total-display').textContent =
+        'R$ ' + v.toFixed(2).replace('.', ',');
+      buildInstallments(v);
+    }
+  });
+ 
+  // Número
+  document.getElementById('f-number').addEventListener('input', function () {
+    this.value = formatCardNumber(this.value);
+    const raw = this.value.replace(/\D/g, '');
+    const brand = detectBrand(raw);
+    document.getElementById('card-preview').style.background =
+      brand ? bgMap[brand] : '#1a1a2e';
+    document.getElementById('card-brand').textContent =
+      brand ? brands[brand].name : '';
+    const display = raw.padEnd(16, '•').replace(/(.{4})/g, '$1 ').trim();
+    document.getElementById('card-number').textContent = display;
+    document.getElementById('err-number').style.display = 'none';
+  });
+ 
+  // Nome
+  document.getElementById('f-name').addEventListener('input', function () {
+    const v = this.value.toUpperCase() || 'NOME DO TITULAR';
+    document.getElementById('card-name').textContent = v.slice(0, 22);
+  });
+ 
+  // Validade
+  document.getElementById('f-expiry').addEventListener('input', function () {
+    let v = this.value.replace(/\D/g, '');
+    if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2, 4);
+    this.value = v;
+    document.getElementById('card-expiry').textContent = v || 'MM/AA';
+    document.getElementById('err-expiry').style.display = 'none';
+  });
+ 
+  // CVV — vira o cartão
+  document.getElementById('f-cvv').addEventListener('focus', () => {
+    document.getElementById('card-back').classList.add('show');
+  });
+  document.getElementById('f-cvv').addEventListener('blur', () => {
+    document.getElementById('card-back').classList.remove('show');
+  });
+  document.getElementById('f-cvv').addEventListener('input', function () {
+    this.value = this.value.replace(/\D/g, '');
+    document.getElementById('card-cvv-display').textContent = this.value || '•••';
+  });
+ 
+  /* ── Submit ── */
+  document.getElementById('pay-btn').addEventListener('click', () => {
+    const num    = document.getElementById('f-number').value;
+    const expiry = document.getElementById('f-expiry').value;
+    let valid = true;
+ 
+    // Valida número (Luhn)
+    if (!luhn(num)) {
+      document.getElementById('err-number').style.display = 'block';
+      valid = false;
+    }
+ 
+    // Valida data
+    const parts = expiry.split('/');
+    const mm = parseInt(parts[0]);
+    const yy = parseInt(parts[1]);
+    const now = new Date();
+    const expDate = new Date(2000 + (yy || 0), (mm || 1) - 1);
+    if (!mm || !yy || expDate < new Date(now.getFullYear(), now.getMonth())) {
+      document.getElementById('err-expiry').style.display = 'block';
+      valid = false;
+    }
+ 
+    if (!valid) return;
+ 
+    const btn = document.getElementById('pay-btn');
+    btn.innerHTML = 'Processando...';
+    btn.disabled = true;
+ 
+    // Simula processamento
+    setTimeout(() => {
+      document.getElementById('form-area').style.display = 'none';
+      const sc = document.getElementById('success-screen');
+      sc.classList.add('show');
+      const inst = document.getElementById('f-installments');
+      const sel  = inst.options[inst.selectedIndex];
+      document.getElementById('success-detail').textContent =
+        document.getElementById('total-display').textContent + ' · ' + sel.textContent;
+      btn.innerHTML = `
+        <svg class="lock-icon" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="11" width="14" height="10" rx="2"/>
+          <path d="M8 11V7a4 4 0 018 0v4"/>
+        </svg>
+        Pagar agora`;
+      btn.disabled = false;
+    }, 1800);
+  });
+ 
+  /* ── Reset ── */
+  function resetForm() {
+    document.getElementById('form-area').style.display = 'block';
+    document.getElementById('success-screen').classList.remove('show');
+    ['f-number', 'f-name', 'f-expiry', 'f-cvv'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('card-number').textContent  = '•••• •••• •••• ••••';
+    document.getElementById('card-name').textContent    = 'NOME DO TITULAR';
+    document.getElementById('card-expiry').textContent  = 'MM/AA';
+    document.getElementById('card-cvv-display').textContent = '•••';
+    document.getElementById('card-brand').textContent   = 'VISA';
+    document.getElementById('card-preview').style.background = '#1a1a2e';
+    document.getElementById('card-back').classList.remove('show');
+  }
+ 
+  /* ── Init ── */
+  buildInstallments(199.90);
+</script>
+ 
+</body>
+</html>
